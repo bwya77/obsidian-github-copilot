@@ -31,6 +31,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
 					icon={message.icon}
 					name={message.name}
 					message={message.message}
+					linkedNotes={message.linkedNotes}
+					role={message.role}
 				/>
 			))}
 			<div ref={endOfMessagesRef} />

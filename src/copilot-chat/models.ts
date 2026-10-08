@@ -246,22 +246,31 @@ export const mergeModelOptions = (
 	knownModels: ModelOption[],
 	discoveredModels: ModelOption[],
 ): ModelOption[] => {
-	const merged = new Map<string, ModelOption>();
-
-	for (const model of knownModels) {
-		merged.set(canonicalizeModelValue(model.value), model);
+	// If discovery returned nothing (e.g. request failed), fall back to the
+	// full hardcoded catalog so the picker isn't empty.
+	if (discoveredModels.length === 0) {
+		return sortModels(knownModels);
 	}
+
+	// Otherwise only offer models the account/tenant actually reports as
+	// available. Previously every entry in `knownModels` was always
+	// included regardless of what was discovered, which let unsupported
+	// models (e.g. not enabled for a given Enterprise tenant) appear in the
+	// picker and fail with a 400 "model_not_supported" error when sent.
+	const merged = new Map<string, ModelOption>();
 
 	for (const model of discoveredModels) {
 		const normalizedValue = canonicalizeModelValue(model.value);
-		const existing = merged.get(normalizedValue);
+		const known = knownModels.find(
+			(m) => canonicalizeModelValue(m.value) === normalizedValue,
+		);
 
-		if (existing) {
+		if (known) {
 			merged.set(normalizedValue, {
-				...existing,
+				...known,
 				...model,
-				value: existing.value,
-				label: existing.label,
+				value: known.value,
+				label: known.label,
 			});
 			continue;
 		}

@@ -77,6 +77,7 @@ export interface CopilotPluginSettings {
 	githubEnterpriseHostname?: string;
 	enableMarkdownRendering: boolean;
 	openChatOnStartup: boolean;
+	autoAttachActiveFile: boolean;
 }
 
 export const DEFAULT_SETTINGS: CopilotPluginSettings = {
@@ -124,6 +125,7 @@ export const DEFAULT_SETTINGS: CopilotPluginSettings = {
 	githubEnterpriseHostname: "",
 	enableMarkdownRendering: true,
 	openChatOnStartup: true,
+	autoAttachActiveFile: true,
 };
 
 class CopilotPluginSettingTab extends PluginSettingTab {
@@ -486,6 +488,20 @@ class CopilotPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableMarkdownRendering)
 					.onChange(async (value) => {
 						this.plugin.settings.enableMarkdownRendering = value;
+						await this.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-attach currently open note")
+			.setDesc(
+				"Automatically include the content of the note open next to the chat as context for your messages, without needing to [[link]] it manually. You can still use [[Note Name]] to link additional notes.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoAttachActiveFile)
+					.onChange(async (value) => {
+						this.plugin.settings.autoAttachActiveFile = value;
 						await this.saveSettings();
 					}),
 			);

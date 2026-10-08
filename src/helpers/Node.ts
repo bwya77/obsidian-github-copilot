@@ -75,13 +75,20 @@ class Node {
 
 			const result = await new Promise<string>((resolve, reject) => {
 				let spawnOptions = {};
+				let commandPath = normalizedPath;
 
 				if (os.platform() === "win32") {
 					spawnOptions = { shell: true };
+					// When shell: true is used on Windows, the command string is
+					// passed as-is to cmd.exe. Paths containing spaces (e.g. the
+					// default "C:\Program Files\nodejs\node.exe" install) must be
+					// quoted or they get split at the space and misinterpreted.
+					// See https://github.com/Pierrad/obsidian-github-copilot/issues/107
+					commandPath = `"${normalizedPath}"`;
 				}
 
 				const nodeProcess = child_process.spawn(
-					normalizedPath,
+					commandPath,
 					["--version"],
 					spawnOptions,
 				);

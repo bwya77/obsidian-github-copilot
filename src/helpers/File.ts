@@ -115,6 +115,25 @@ class File {
 		});
 	}
 
+	/**
+	 * Promise-based wrapper around downloadFile. `downloadFile` itself takes
+	 * a callback and returns void, so callers that `await` it directly do
+	 * not actually wait for the download to finish. This wrapper lets
+	 * callers properly await completion before relying on the downloaded
+	 * file (e.g. before unzipping it).
+	 */
+	public static downloadFileAsync(url: string, dest: string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			File.downloadFile(url, dest, (err) => {
+				if (err) {
+					reject(err);
+				} else {
+					resolve();
+				}
+			});
+		});
+	}
+
 	public static unzipFile(zipPath: string, destDir: string) {
 		const zip = new AdmZip(zipPath);
 		zip.extractAllTo(destDir, true);

@@ -6,8 +6,12 @@ import {
 	ConversationSlice,
 	createConversationSlice,
 } from "./slices/conversation";
+import {
+	ActiveFileSlice,
+	createActiveFileSlice,
+} from "./slices/activeFile";
 
-type StoreState = AuthSlice & MessageSlice & ConversationSlice;
+type StoreState = AuthSlice & MessageSlice & ConversationSlice & ActiveFileSlice;
 
 type BoundStateCreator<T> = StateCreator<StoreState, [], [], T>;
 
@@ -25,10 +29,15 @@ const boundConversationSlice: BoundStateCreator<ConversationSlice> = (
 	...createConversationSlice(...a),
 });
 
+const boundActiveFileSlice: BoundStateCreator<ActiveFileSlice> = (...a) => ({
+	...createActiveFileSlice(...a),
+});
+
 export const useCopilotStore = create<StoreState>()((...a) => ({
 	...boundAuthSlice(...a),
 	...boundMessageSlice(...a),
 	...boundConversationSlice(...a),
+	...boundActiveFileSlice(...a),
 }));
 
 export const useAuthStore = useCopilotStore;

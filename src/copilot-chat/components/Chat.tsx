@@ -19,13 +19,15 @@ const Chat: React.FC = () => {
 		conversations,
 		activeConversationId,
 		initConversationService,
+		initActiveFileTracking,
 	} = useCopilotStore();
 
 	useEffect(() => {
 		if (plugin) {
 			initConversationService(plugin);
+			initActiveFileTracking(plugin);
 		}
-	}, [plugin, initConversationService]);
+	}, [plugin, initConversationService, initActiveFileTracking]);
 
 	const displayMessages = activeConversationId
 		? conversations.find((conv) => conv.id === activeConversationId)
@@ -38,6 +40,7 @@ const Chat: React.FC = () => {
 			name: message.role === "assistant" ? "GitHub Copilot" : "User",
 			message: message.content,
 			linkedNotes: message.linkedNotes,
+			role: message.role,
 		}),
 	);
 

@@ -203,13 +203,19 @@ export const createMessageSlice: StateCreator<
 				};
 			}
 
+			// Reasoning models (GPT-5.x family) reject any explicit
+			// temperature other than the default (1) and return a 400
+			// "unsupported_value" error, so omit it for those models.
+			const isReasoningModel = supportsReasoningEffort(
+				get().selectedModel,
+			);
+
 			const requestData: SendMessageRequest = {
 				intent: false,
 				model: get().selectedModel.value,
-				...(supportsReasoningEffort(get().selectedModel)
+				...(isReasoningModel
 					? { reasoning_effort: get().reasoningEffort }
-					: {}),
-				temperature: 0,
+					: { temperature: 0 }),
 				top_p: 1,
 				n: 1,
 				stream: false,

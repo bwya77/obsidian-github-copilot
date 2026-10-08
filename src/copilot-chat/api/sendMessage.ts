@@ -6,7 +6,7 @@ export interface SendMessageRequest {
 	intent: boolean;
 	model: string;
 	reasoning_effort?: ReasoningEffort;
-	temperature: number;
+	temperature?: number;
 	top_p: number;
 	n: number;
 	stream: boolean;
@@ -100,8 +100,13 @@ export const sendMessage = async (
 		const response: RequestUrlResponse = await requestUrl({
 			url: `${apiBaseUrl}/chat/completions`,
 			method: "POST",
+			// `throw: false` so we get the actual response (status + body)
+			// back on non-2xx instead of an opaque generic Error from
+			// Obsidian's requestUrl, which otherwise masks the real cause.
+			throw: false,
 			headers: {
 				Accept: "*/*",
+				"Content-Type": "application/json",
 				"editor-version": "vscode/1.80.1",
 				Authorization: `Bearer ${accessToken}`,
 			},
@@ -109,12 +114,23 @@ export const sendMessage = async (
 		});
 
 		if (response.status !== 200) {
-			throw new Error(`Failed to fetch PAT: ${response.status}`);
+			const bodyText =
+				typeof response.text === "string"
+					? response.text
+					: JSON.stringify(response.json);
+			Logger.getInstance().error(
+				`Send message failed with status ${response.status}: ${bodyText}`,
+			);
+			throw new Error(
+				`Failed to send message: HTTP ${response.status} - ${bodyText}`,
+			);
 		}
 
 		return await response.json;
 	} catch (error) {
 		Logger.getInstance().error(`Error sending message: ${error}`);
-		throw new Error("Failed to send message");
+		throw error instanceof Error
+			? error
+			: new Error("Failed to send message");
 	}
 };

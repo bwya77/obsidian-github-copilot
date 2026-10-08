@@ -1,4 +1,7 @@
 import { App, FileSystemAdapter } from "obsidian";
+import * as os from "os";
+import * as path from "path";
+import * as crypto from "crypto";
 
 class Vault {
 	public static DEFAULT_TAB_SIZE = 4;
@@ -21,8 +24,35 @@ class Vault {
 		return `${this.getConfigPath(app)}/plugins/github-copilot`;
 	}
 
+	/**
+	 * Base directory, outside the vault, used to cache the downloaded
+	 * copilot-language-server binaries. This intentionally lives outside
+	 * the vault (which is frequently stored under OneDrive/other synced
+	 * cloud folders) because the language server bundle includes native
+	 * modules (e.g. crypt32.node) whose binary content can trip DLP /
+	 * sensitivity scanners that pattern-match for things like X.509
+	 * certificate/private key material. Keeping large vendor binaries out
+	 * of the synced vault avoids that entirely and also avoids needlessly
+	 * syncing/re-uploading ~40MB of binaries on every device.
+	 */
+	public static getExternalCacheBasePath(app: App): string {
+		const vaultId = crypto
+			.createHash("md5")
+			.update(this.getBasePath(app))
+			.digest("hex")
+			.slice(0, 12);
+		return path.join(
+			os.homedir(),
+			".obsidian-github-copilot-cache",
+			vaultId,
+		);
+	}
+
 	public static getCopilotPath(app: App, version: string): string {
-		return `${this.getPluginPath(app)}/copilot-${version}`;
+		return path.join(
+			this.getExternalCacheBasePath(app),
+			`copilot-${version}`,
+		);
 	}
 
 	public static getAgentPath(app: App, version: string): string {

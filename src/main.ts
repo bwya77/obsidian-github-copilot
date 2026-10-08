@@ -1,4 +1,5 @@
 import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import * as fs from "fs";
 
 import EventManager from "./events/EventManager";
 import CopilotAgent from "./copilot/CopilotAgent";
@@ -37,38 +38,35 @@ export default class CopilotPlugin extends Plugin {
 
 		this.tabSize = Vault.getTabSize(this.app);
 
-		// Recreate or update the copilot folder and artifacts from the bundle
-		if (
-			!File.doesFolderExist(Vault.getCopilotPath(this.app, this.version))
-		) {
-			await File.createFolder(
-				Vault.getCopilotPath(this.app, this.version),
-			);
+		// Recreate or update the copilot folder and artifacts from the bundle.
+		// Also detect a previously incomplete/corrupted extraction (missing
+		// the language-server.js entry point) so the plugin can self-heal
+		// instead of silently trying to spawn a nonexistent agent forever.
+		const copilotPath = Vault.getCopilotPath(this.app, this.version);
+		const agentIsMissing = !fs.existsSync(
+			Vault.getAgentPath(this.app, this.version),
+		);
+		if (!File.doesFolderExist(copilotPath) || agentIsMissing) {
+			await File.createFolder(copilotPath);
 
-			await File.downloadFile(
-				github.RELEASE_URL(this.version),
-				Vault.getCopilotPath(this.app, this.version) + ".zip",
-				(err) => {
-					if (err) {
-						Logger.getInstance().log(`Download failed: ${err}`);
-					} else {
-						Logger.getInstance().log("Download finished.");
-						File.unzipFile(
-							Vault.getCopilotPath(this.app, this.version) +
-								".zip",
-							Vault.getCopilotPath(this.app, this.version),
-						);
-						File.removeFile(
-							Vault.getCopilotPath(this.app, this.version) +
-								".zip",
-						);
-					}
-				},
-			);
+			try {
+				await File.downloadFileAsync(
+					github.RELEASE_URL(this.version),
+					copilotPath + ".zip",
+				);
+				Logger.getInstance().log("Download finished.");
+				File.unzipFile(copilotPath + ".zip", copilotPath);
+				File.removeFile(copilotPath + ".zip");
+			} catch (err) {
+				Logger.getInstance().log(`Download failed: ${err}`);
+				new Notice(
+					"[GitHub Copilot] Failed to download the Copilot language server. Please restart Obsidian to retry.",
+				);
+			}
 
 			await File.removeOldCopilotFolders(
 				this.version,
-				Vault.getPluginPath(this.app),
+				Vault.getExternalCacheBasePath(this.app),
 			);
 		}
 

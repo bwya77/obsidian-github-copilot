@@ -76,8 +76,12 @@ class Client {
 			},
 		});
 		await this.initialized();
-		await this.checkStatus();
+		// The github-enterprise hostname (if configured) must reach the
+		// language server before any status/auth check, otherwise checkStatus
+		// runs against the default github.com host instead of the enterprise
+		// instance. See https://github.com/Pierrad/obsidian-github-copilot/issues/95
 		await this.setConfiguration();
+		await this.checkStatus();
 		await this.setEditorInfo();
 	}
 

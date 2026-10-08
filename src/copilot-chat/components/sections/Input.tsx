@@ -5,7 +5,7 @@ import { useCopilotStore } from "../../store/store";
 import { usePlugin } from "../../hooks/usePlugin";
 import ModelSelector from "./ModelSelector";
 import FileSuggestion from "../atoms/FileSuggestion";
-import { Notice } from "obsidian";
+import { Notice, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "../../../settings/CopilotPluginSettingTab";
 
 const BASE_CLASSNAME = "copilot-chat-input";
@@ -22,7 +22,13 @@ interface CursorPosition {
 const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 	const [message, setMessage] = useState("");
 	const plugin = usePlugin();
-	const { sendMessage, isAuthenticated } = useCopilotStore();
+	const {
+		sendMessage,
+		isAuthenticated,
+		activeFile,
+		autoAttachActiveFile,
+		setAutoAttachActiveFile,
+	} = useCopilotStore();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [cursorPosition, setCursorPosition] = useState<CursorPosition>({
 		start: 0,
@@ -158,6 +164,33 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 			}
 		}
 
+		// Auto-attach the note currently open next to the chat, so the
+		// assistant is aware of it even without an explicit [[link]].
+		if (
+			autoAttachActiveFile &&
+			activeFile &&
+			!processedFiles.has(activeFile.filename)
+		) {
+			const file = plugin.app.vault.getAbstractFileByPath(
+				activeFile.path,
+			);
+			if (file instanceof TFile) {
+				try {
+					const content = await plugin.app.vault.read(file);
+					fileRefs.push({
+						path: activeFile.path,
+						filename: activeFile.filename,
+						content,
+					});
+				} catch (error) {
+					console.error(
+						`Error reading active file ${activeFile.filename}:`,
+						error,
+					);
+				}
+			}
+		}
+
 		return fileRefs.length > 0 ? fileRefs : undefined;
 	};
 
@@ -247,6 +280,39 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 	return (
 		<div className={concat(BASE_CLASSNAME, "container")}>
 			<ModelSelector isAuthenticated={isAuthenticated} />
+			{activeFile && (
+				<div className={concat(BASE_CLASSNAME, "active-file-chip")}>
+					<span
+						className={concat(
+							BASE_CLASSNAME,
+							"active-file-chip-label",
+						)}
+					>
+						{autoAttachActiveFile ? "📎 Attached: " : "⏸ Not attached: "}
+						{activeFile.filename}
+					</span>
+					<button
+						type="button"
+						className={concat(
+							BASE_CLASSNAME,
+							"active-file-chip-toggle",
+						)}
+						onClick={() =>
+							setAutoAttachActiveFile(
+								plugin,
+								!autoAttachActiveFile,
+							)
+						}
+						title={
+							autoAttachActiveFile
+								? "Stop attaching this note to new messages"
+								: "Attach this note to new messages"
+						}
+					>
+						{autoAttachActiveFile ? "Detach" : "Attach"}
+					</button>
+				</div>
+			)}
 			<div className={concat(BASE_CLASSNAME, "input-container")}>
 				<textarea
 					ref={textareaRef}
