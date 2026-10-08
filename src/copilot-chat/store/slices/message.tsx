@@ -186,20 +186,17 @@ export const createMessageSlice: StateCreator<
 				? [{ content: systemPrompt, role: "system" }, ...messageHistory]
 				: messageHistory;
 
-			if (notes.length > 0 && messages.length > 0) {
-				const lastUserMessageIndex = messages.length - 1;
-
-				const lastUserMessage = messages[lastUserMessageIndex];
-				const linkedNotesText = notes
-					.map(
-						(note) =>
-							`\n\nReferenced content from [[${note.filename}]]:\n${note.content}`,
-					)
-					.join("\n\n");
-
-				messages[lastUserMessageIndex] = {
-					...lastUserMessage,
-					content: `${lastUserMessage.content}${linkedNotesText}`,
+			// Replace the current turn's content with the full apiMessage
+			// (built by the caller to include referenced/linked note content
+			// and any structured vault context, e.g. the opportunity
+			// ground-truth table) instead of the bare display text stored in
+			// conversation history for UI rendering. Earlier turns in the
+			// conversation keep their original display-only content.
+			if (messages.length > 0) {
+				const lastIndex = messages.length - 1;
+				messages[lastIndex] = {
+					...messages[lastIndex],
+					content: apiMessage,
 				};
 			}
 

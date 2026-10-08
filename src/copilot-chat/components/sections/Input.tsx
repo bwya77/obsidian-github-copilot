@@ -7,6 +7,7 @@ import ModelSelector from "./ModelSelector";
 import FileSuggestion from "../atoms/FileSuggestion";
 import { Notice, TFile } from "obsidian";
 import { DEFAULT_SETTINGS } from "../../../settings/CopilotPluginSettingTab";
+import { searchVaultForQuery, dedupeFileRefs, buildVaultIndex } from "../../../helpers/VaultSearch";
 
 const BASE_CLASSNAME = "copilot-chat-input";
 
@@ -127,7 +128,9 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 		});
 	};
 
-	const extractLinkedNotes = async () => {
+	const extractLinkedNotes = async (
+		options?: { skipVaultSearch?: boolean },
+	) => {
 		if (!plugin) return null;
 
 		const fileRefs: { path: string; filename: string; content: string }[] =
@@ -191,23 +194,100 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 			}
 		}
 
-		return fileRefs.length > 0 ? fileRefs : undefined;
+		// Search the whole vault for notes relevant to the question, so
+		// the model is grounded in the user's own notes (e.g. internal
+		// process docs) instead of guessing from general knowledge, even
+		// when the user didn't explicitly [[link]] or have a note open.
+		//
+		// Skipped when a structured vault summary (e.g. the opportunity
+		// ground-truth table) already answers the question definitively —
+		// otherwise this keyword search tends to pull in long, unrelated
+		// prose notes (meeting transcripts, technical docs) that happen to
+		// repeat query words many times, drowning out the small, precise
+		// structured table in a sea of irrelevant context.
+		const searchVaultForContext =
+			!options?.skipVaultSearch &&
+			(plugin.settings.searchVaultForContext ??
+				DEFAULT_SETTINGS.searchVaultForContext);
+
+		if (searchVaultForContext) {
+			try {
+				const existingPaths = new Set(
+					fileRefs.map((ref) => ref.path),
+				);
+				const vaultMatches = await searchVaultForQuery(
+					plugin.app,
+					message,
+					{
+						limit:
+							plugin.settings.maxVaultSearchResults ??
+							DEFAULT_SETTINGS.maxVaultSearchResults,
+						excludePaths: existingPaths,
+					},
+				);
+				for (const match of vaultMatches) {
+					fileRefs.push({
+						path: match.path,
+						filename: match.filename,
+						content: match.content,
+					});
+				}
+			} catch (error) {
+				console.error("Error searching vault for context:", error);
+			}
+		}
+
+		return fileRefs.length > 0
+			? dedupeFileRefs(fileRefs)
+			: undefined;
 	};
 
 	const handleSubmit = async () => {
 		if (message.trim() === "" || isLoading || !isAuthenticated) return;
 
 		try {
-			const linkedNotes = (await extractLinkedNotes()) || undefined;
+			// Build a general-purpose index of every note's own frontmatter
+			// properties FIRST (works for any vault schema — opportunities,
+			// meetings, trainings, whatever properties this vault actually
+			// uses), so we know whether to skip the noisier generic
+			// keyword search below in favor of this more precise context.
+			let vaultIndexResult: {
+				summary: string;
+				rowCount: number;
+				truncated: boolean;
+			} | null = null;
+			const searchVaultForContext =
+				plugin?.settings.searchVaultForContext ??
+				DEFAULT_SETTINGS.searchVaultForContext;
+			if (plugin && searchVaultForContext) {
+				try {
+					vaultIndexResult = await buildVaultIndex(plugin.app);
+				} catch (error) {
+					console.error("Error building vault index:", error);
+				}
+			}
+
+			const linkedNotes =
+				(await extractLinkedNotes({
+					skipVaultSearch: !!vaultIndexResult,
+				})) || undefined;
 			const displayMessage = message;
-			const apiMessage = linkedNotes
-				? `${message}\n\n${linkedNotes
-						.map(
-							(note) =>
-								`Referenced content from [[${note.filename}]]:\n${note.content}`,
-						)
-						.join("\n\n")}`
+
+			// Put the structured vault index immediately after the user's
+			// question (maximum attention / clearly present, not buried
+			// under other context), then any linked/searched notes.
+			let apiMessage = vaultIndexResult
+				? `${message}\n\n${vaultIndexResult.summary}`
 				: message;
+
+			if (linkedNotes) {
+				apiMessage = `${apiMessage}\n\n${linkedNotes
+					.map(
+						(note) =>
+							`Referenced content from [[${note.filename}]]:\n${note.content}`,
+					)
+					.join("\n\n")}`;
+			}
 
 			await sendMessage(plugin, apiMessage, displayMessage, linkedNotes);
 			setMessage("");

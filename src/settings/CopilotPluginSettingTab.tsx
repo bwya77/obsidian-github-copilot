@@ -78,6 +78,8 @@ export interface CopilotPluginSettings {
 	enableMarkdownRendering: boolean;
 	openChatOnStartup: boolean;
 	autoAttachActiveFile: boolean;
+	searchVaultForContext: boolean;
+	maxVaultSearchResults: number;
 }
 
 export const DEFAULT_SETTINGS: CopilotPluginSettings = {
@@ -119,13 +121,28 @@ export const DEFAULT_SETTINGS: CopilotPluginSettings = {
 		reasoningEffort: DEFAULT_REASONING_EFFORT,
 	},
 	systemPrompt:
-		"You are GitHub Copilot, an AI assistant. You are helping the user with their tasks in Obsidian.",
+		"You are GitHub Copilot, an AI assistant. You are helping the user with their tasks in Obsidian. " +
+		"Relevant notes from the user's own Obsidian vault may be attached below as \"Referenced content\", " +
+		"and a \"Vault index\" table covering every note's own frontmatter properties (whatever properties " +
+		"this particular vault actually uses — Type, Status, Company, Occurrence, Stage, dates, or anything " +
+		"else) may also be attached. When present, always check that table FIRST: read/filter/group it " +
+		"yourself the way a person would scan a spreadsheet (e.g. find rows where a property equals a value, " +
+		"or where a note is linked to a given company) and treat it as the complete, authoritative answer " +
+		"rather than inferring from other notes or general/public knowledge — especially for anything that " +
+		"sounds internal, organization-specific, or proprietary (e.g. internal Microsoft processes, personal " +
+		"projects, or private terminology). Whenever you reference a specific note from the vault in your " +
+		"reply, always wrap its exact name in double square brackets like [[Note Name]] (reuse the [[...]] " +
+		"tokens from the attached context verbatim where possible) so the user can click it to open that " +
+		"note directly. If the attached context doesn't contain the answer, say so explicitly rather than " +
+		"guessing, and ask whether the user wants you to answer from general knowledge or search the web instead.",
 	invertEnterSendBehavior: false,
 	extraCACerts: "",
 	githubEnterpriseHostname: "",
 	enableMarkdownRendering: true,
 	openChatOnStartup: true,
 	autoAttachActiveFile: true,
+	searchVaultForContext: true,
+	maxVaultSearchResults: 5,
 };
 
 class CopilotPluginSettingTab extends PluginSettingTab {
@@ -502,6 +519,36 @@ class CopilotPluginSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.autoAttachActiveFile)
 					.onChange(async (value) => {
 						this.plugin.settings.autoAttachActiveFile = value;
+						await this.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Search vault for relevant notes")
+			.setDesc(
+				"Before sending a message, search your entire vault for notes relevant to your question and attach the best matches as context, so Copilot answers from your own notes (e.g. internal process docs) instead of guessing from general knowledge.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.searchVaultForContext)
+					.onChange(async (value) => {
+						this.plugin.settings.searchVaultForContext = value;
+						await this.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max vault search results")
+			.setDesc(
+				"Maximum number of vault notes to attach per message when vault search is enabled.",
+			)
+			.addSlider((slider) =>
+				slider
+					.setLimits(1, 10, 1)
+					.setValue(this.plugin.settings.maxVaultSearchResults)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.maxVaultSearchResults = value;
 						await this.saveSettings();
 					}),
 			);

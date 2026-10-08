@@ -109,7 +109,13 @@ export default class CopilotPlugin extends Plugin {
 
 		this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
 		if (this.settings.openChatOnStartup) {
-			this.activateView();
+			// Defer until the workspace layout has fully loaded — calling
+			// getRightLeaf() before then can hit a null workspace split
+			// internally in Obsidian and throw (surfacing as "Cannot read
+			// properties of null (reading 'children')").
+			this.app.workspace.onLayoutReady(() => {
+				this.activateView();
+			});
 		}
 
 		this.addCommand({
@@ -133,19 +139,28 @@ export default class CopilotPlugin extends Plugin {
 	}
 
 	async activateView(): Promise<void> {
-		const { workspace } = this.app;
+		try {
+			const { workspace } = this.app;
 
-		let leaf: WorkspaceLeaf | null = null;
-		const leaves = workspace.getLeavesOfType(CHAT_VIEW_TYPE);
-		if (leaves.length > 0) {
-			leaf = leaves[0];
-		} else {
-			leaf = workspace.getRightLeaf(false);
-			await leaf?.setViewState({ type: CHAT_VIEW_TYPE, active: true });
-		}
-		if (!leaf) {
-			Logger.getInstance().error("Failed to create chat view.");
-			return;
+			let leaf: WorkspaceLeaf | null = null;
+			const leaves = workspace.getLeavesOfType(CHAT_VIEW_TYPE);
+			if (leaves.length > 0) {
+				leaf = leaves[0];
+			} else {
+				leaf = workspace.getRightLeaf(false);
+				await leaf?.setViewState({
+					type: CHAT_VIEW_TYPE,
+					active: true,
+				});
+			}
+			if (!leaf) {
+				Logger.getInstance().error("Failed to create chat view.");
+				return;
+			}
+		} catch (error) {
+			Logger.getInstance().error(
+				`Failed to activate Copilot Chat view: ${error}`,
+			);
 		}
 	}
 
