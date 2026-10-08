@@ -80,6 +80,7 @@ export interface CopilotPluginSettings {
 	autoAttachActiveFile: boolean;
 	searchVaultForContext: boolean;
 	maxVaultSearchResults: number;
+	confirmBeforeDeletingConversation: boolean;
 }
 
 export const DEFAULT_SETTINGS: CopilotPluginSettings = {
@@ -143,6 +144,7 @@ export const DEFAULT_SETTINGS: CopilotPluginSettings = {
 	autoAttachActiveFile: true,
 	searchVaultForContext: true,
 	maxVaultSearchResults: 5,
+	confirmBeforeDeletingConversation: true,
 };
 
 class CopilotPluginSettingTab extends PluginSettingTab {
@@ -549,6 +551,23 @@ class CopilotPluginSettingTab extends PluginSettingTab {
 					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.maxVaultSearchResults = value;
+						await this.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Confirm before deleting a conversation")
+			.setDesc(
+				"Show an \"Are you sure?\" prompt before deleting the current conversation. Disable to delete immediately without confirmation.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(
+						this.plugin.settings.confirmBeforeDeletingConversation,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.confirmBeforeDeletingConversation =
+							value;
 						await this.saveSettings();
 					}),
 			);

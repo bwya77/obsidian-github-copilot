@@ -28,15 +28,26 @@ const Header: React.FC = () => {
 		if (isDeletingRef.current) return;
 		isDeletingRef.current = true;
 
+		const confirmBeforeDeleting =
+			plugin?.settings.confirmBeforeDeletingConversation ??
+			DEFAULT_SETTINGS.confirmBeforeDeletingConversation;
+
+		const doDelete = () => {
+			if (activeConversationId && plugin) {
+				deleteConversation(plugin, activeConversationId);
+				clearMessages();
+				createConversation(plugin, selectedModel);
+			} else {
+				clearMessages();
+			}
+		};
+
 		setTimeout(() => {
-			if (confirm("Are you sure you want to delete this conversation?")) {
-				if (activeConversationId && plugin) {
-					deleteConversation(plugin, activeConversationId);
-					clearMessages();
-					createConversation(plugin, selectedModel);
-				} else {
-					clearMessages();
-				}
+			if (
+				!confirmBeforeDeleting ||
+				confirm("Are you sure you want to delete this conversation?")
+			) {
+				doDelete();
 			}
 			setTimeout(() => {
 				isDeletingRef.current = false;

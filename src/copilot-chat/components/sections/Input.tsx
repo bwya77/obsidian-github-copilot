@@ -128,9 +128,7 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 		});
 	};
 
-	const extractLinkedNotes = async (
-		options?: { skipVaultSearch?: boolean },
-	) => {
+	const extractLinkedNotes = async () => {
 		if (!plugin) return null;
 
 		const fileRefs: { path: string; filename: string; content: string }[] =
@@ -194,21 +192,18 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 			}
 		}
 
-		// Search the whole vault for notes relevant to the question, so
-		// the model is grounded in the user's own notes (e.g. internal
-		// process docs) instead of guessing from general knowledge, even
-		// when the user didn't explicitly [[link]] or have a note open.
-		//
-		// Skipped when a structured vault summary (e.g. the opportunity
-		// ground-truth table) already answers the question definitively —
-		// otherwise this keyword search tends to pull in long, unrelated
-		// prose notes (meeting transcripts, technical docs) that happen to
-		// repeat query words many times, drowning out the small, precise
-		// structured table in a sea of irrelevant context.
+		// Search the whole vault for notes relevant to the question by
+		// actual content/prose (meeting transcripts, write-ups), so the
+		// model is grounded in the user's own notes instead of guessing
+		// from general knowledge, even when the user didn't explicitly
+		// [[link]] or have a note open. This is complementary to (not a
+		// replacement for) the structured vault index built in
+		// handleSubmit: the index covers each note's frontmatter
+		// properties only, while this covers actual body text content —
+		// both are attached together.
 		const searchVaultForContext =
-			!options?.skipVaultSearch &&
-			(plugin.settings.searchVaultForContext ??
-				DEFAULT_SETTINGS.searchVaultForContext);
+			plugin.settings.searchVaultForContext ??
+			DEFAULT_SETTINGS.searchVaultForContext;
 
 		if (searchVaultForContext) {
 			try {
@@ -268,9 +263,7 @@ const Input: React.FC<InputProps> = ({ isLoading = false }) => {
 			}
 
 			const linkedNotes =
-				(await extractLinkedNotes({
-					skipVaultSearch: !!vaultIndexResult,
-				})) || undefined;
+				(await extractLinkedNotes()) || undefined;
 			const displayMessage = message;
 
 			// Put the structured vault index immediately after the user's
